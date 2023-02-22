@@ -1,7 +1,4 @@
-#To do list: 
-#   clock generator block
-
-HDL_file_name = 'FA' # str(input("Enter verilog file name: "))
+HDL_file_name = str(input("Enter verilog file name: "))
 file = open(HDL_file_name+'.v', 'r')
 rtl_code = file.read()
 test_bench=open(HDL_file_name+'_tb.v', 'w')
@@ -9,14 +6,15 @@ test_bench=open(HDL_file_name+'_tb.v', 'w')
 # remove comments from rtl_code
 while("//" in rtl_code):
     rtl_code = rtl_code[:rtl_code.find("//")] + rtl_code[rtl_code.find("\n",rtl_code.find("//")) :]
+while("/*" in rtl_code):
+    rtl_code = rtl_code[:rtl_code.find("/*")] + rtl_code[rtl_code.find("*/")+2:]
 
 rtl_code = " ".join(rtl_code.split()) #remove all white spaces
 
-
 # get module name
 module_name_start_index = rtl_code.find("module") + 6
-module_name_stop_index = rtl_code.find("(")
-module_name = rtl_code[module_name_start_index:module_name_stop_index]
+module_name_stop_index = rtl_code.find("(") if rtl_code.find("#") > rtl_code.find("(") else rtl_code.find("#")
+module_name = rtl_code[module_name_start_index:module_name_stop_index].strip()
 
 # check if there is a clock signal 
 clk_signal = 1 if "clk" in rtl_code else 0
@@ -38,7 +36,6 @@ else:
     last_index = rtl_code.find(';',rtl_code.rfind("input"))+1
     
 rtl_code = rtl_code[first_index:last_index]
-print(rtl_code)
 
 rtl_code = [char for char in rtl_code if char != ' ' ] # convert the code to a list of characters
 
@@ -117,15 +114,15 @@ for i, char in enumerate(rtl_code):
 # remove wire, reg from signals names
 for i,signal in enumerate(input_vector):
     if "wire" in signal:
-        input_vector[i] = signal[signal.find("wire")+4:].strip()
+        input_vector[i] = signal[signal.find("wire")+4:]
     elif "reg" in signal:
-        input_vector[i] = signal[signal.find("reg")+3:].strip()
+        input_vector[i] = signal[signal.find("reg")+3:]
 
 for i,signal in enumerate(output_vector):
     if "wire" in signal:
-        output_vector[i] = signal[signal.find("wire")+4:].strip()
+        output_vector[i] = signal[signal.find("wire")+4:]
     elif "reg" in signal:
-        output_vector[i] = signal[signal.find("reg")+4:].strip()
+        output_vector[i] = signal[signal.find("reg")+4:]
 
 test_bench.write("/*test bench is automatically generated*/\n\n")
 test_bench.write("module ")
@@ -154,7 +151,6 @@ for output in output_vector:
         output = output[output.find(']')+1:]
     test_bench.write("\t."+output+f'({output})\n')
 
-print(input_vector)
 test_bench.write("\t);")
 
 ############ clock generator block ############
