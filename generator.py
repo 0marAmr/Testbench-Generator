@@ -1,35 +1,44 @@
 #To do list: 
-#   deal with comments in code
 #   clock generator block
 
-HDL_name = 'FA' # str(input("Enter verilog file name: "))
-file = open(HDL_name+'.v', 'r')
-test_bench=open(HDL_name+'_tb.v', 'w')
+HDL_file_name = 'FA' # str(input("Enter verilog file name: "))
+file = open(HDL_file_name+'.v', 'r')
+rtl_code = file.read()
+test_bench=open(HDL_file_name+'_tb.v', 'w')
 
-# before removing spaces we'll make use of \n to eliminate comments :)
+# remove comments from rtl_code
+while("//" in rtl_code):
+    rtl_code = rtl_code[:rtl_code.find("//")] + rtl_code[rtl_code.find("\n",rtl_code.find("//")) :]
 
-rtl_code = " ".join(file.read().split()) #remove all white spaces
+rtl_code = " ".join(rtl_code.split()) #remove all white spaces
+
 
 # get module name
 module_name_start_index = rtl_code.find("module") + 6
 module_name_stop_index = rtl_code.find("(")
 module_name = rtl_code[module_name_start_index:module_name_stop_index]
 
-instance_name = 'uut'
+# check if there is a clock signal 
+clk_signal = 1 if "clk" in rtl_code else 0
+clk_period_value = 20
+
+instance_name = 'uut' 
+
 
 ## trim the rtl code to get the inputs and outputs
-
+# first index
 if rtl_code.find("input") < rtl_code.find("output"):
     first_index = rtl_code.find("input")
 else:
     first_index = rtl_code.find("output")
-
+# last index
 if rtl_code.rfind("output") > rtl_code.rfind("input"):
-    last_index = rtl_code[rtl_code.rfind("output"):].find(';')+rtl_code.rfind("output")+1
+    last_index = rtl_code.find(';',rtl_code.rfind("output"))+1 # 1 is added to include the semi-colon @ the end
 else:
-    last_index = rtl_code[rtl_code.rfind("input"):].find(';')+rtl_code.rfind("input") +1
-
+    last_index = rtl_code.find(';',rtl_code.rfind("input"))+1
+    
 rtl_code = rtl_code[first_index:last_index]
+print(rtl_code)
 
 rtl_code = [char for char in rtl_code if char != ' ' ] # convert the code to a list of characters
 
@@ -92,9 +101,22 @@ for i, char in enumerate(rtl_code):
         else :
             signal += char
             
+# remove wire, reg from signals names
+for i,signal in enumerate(input_vector):
+    if "wire" in signal:
+        input_vector[i] = signal[4:]
+    elif "reg" in signal:
+        input_vector[i] = signal[3:]
 
+for i,signal in enumerate(output_vector):
+    if "wire" in signal:
+        output_vector[i] = signal[4:]
+    elif "reg" in signal:
+        output_vector[i] = signal[3:]
+
+test_bench.write("/*test bench is automatically generated*/\n\n")
 test_bench.write("module ")
-test_bench.write(HDL_name+'_tb' + ';\n\n')
+test_bench.write(module_name+'_tb' + ';\n\n')
 
 ############ signals declaration ############
 test_bench.write("// input signals\n")
@@ -107,7 +129,7 @@ for output in output_vector:
 
 ############ instantiation ############
 test_bench.write("\n// instantiation\n")
-test_bench.write(module_name + instance_name + "(\n")
+test_bench.write(module_name + ' ' + instance_name + "(\n")
 
 for input in input_vector:
     if ']' in input:
@@ -121,10 +143,18 @@ for output in output_vector:
     
 test_bench.write("\t);")
 
+############ clock generator block ############
+if clk_signal:
+    test_bench.write("\n\n// clock signal\n")
+    test_bench.write(f"parameter PERIOD  = {clk_period_value};\n\n")
+    test_bench.write("initial "+ "begin\n")
+    test_bench.write("clk = 0;\n")
+    test_bench.write("forever #(PERIOD/2)  clk=~clk; \nend" +'\n')
+    
+    
 ############ initial block ############
 test_bench.write("\n\n// test vector generator\n")
-test_bench.write("initial "+ "begin" +'\n')
-test_bench.write('\n')
+test_bench.write("initial "+ "begin\n\n")
 test_bench.write("$finish; \nend" +'\n')
 
 test_bench.write("\nendmodule")
