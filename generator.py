@@ -47,7 +47,9 @@ output_vector=[]
 
 temp = ''
 signal = ''
+size = ''
 discard_char = 1 # discard the first captured character
+
 
 for i, char in enumerate(rtl_code):
     temp = temp + char
@@ -60,10 +62,12 @@ for i, char in enumerate(rtl_code):
     if temp.count("input") > 1 : 
         temp = "input"
         signal = ''
+        size = ''
         continue
     elif temp.count("output") > 1 : 
         temp = "output"
         signal = ''
+        size = ''
         continue
         
     if char == ')' :
@@ -74,12 +78,17 @@ for i, char in enumerate(rtl_code):
         break
     
     if "input" in temp :
-        if char == "," or char ==';':
-            input_vector.append(signal)
+        if ']' in temp:
+            size = temp[temp.find('['): temp.find(']')+1]
+            signal = ''
+            temp = "input"
+        elif char == "," or char ==';':
+            input_vector.append(size + " " + signal)
             signal = ''
         elif "output" in temp:
             temp = "output"
             signal = ''
+            size = ''
             discard_char = 1
         elif discard_char:
             discard_char  = 0
@@ -88,7 +97,11 @@ for i, char in enumerate(rtl_code):
             signal += char
     
     if "output" in temp :
-        if char == ',' or char ==';':
+        if ']' in temp:
+            size = temp[temp.find('['): temp.find(']')+1]
+            signal = ''
+            temp = "output"
+        elif char == ',' or char ==';':
             output_vector.append(signal)
             signal = ''
         elif "input" in temp:
@@ -100,19 +113,19 @@ for i, char in enumerate(rtl_code):
             continue
         else :
             signal += char
-            
+
 # remove wire, reg from signals names
 for i,signal in enumerate(input_vector):
     if "wire" in signal:
-        input_vector[i] = signal[4:]
+        input_vector[i] = signal[signal.find("wire")+4:].strip()
     elif "reg" in signal:
-        input_vector[i] = signal[3:]
+        input_vector[i] = signal[signal.find("reg")+3:].strip()
 
 for i,signal in enumerate(output_vector):
     if "wire" in signal:
-        output_vector[i] = signal[4:]
+        output_vector[i] = signal[signal.find("wire")+4:].strip()
     elif "reg" in signal:
-        output_vector[i] = signal[3:]
+        output_vector[i] = signal[signal.find("reg")+4:].strip()
 
 test_bench.write("/*test bench is automatically generated*/\n\n")
 test_bench.write("module ")
@@ -140,7 +153,8 @@ for output in output_vector:
     if ']' in output:
         output = output[output.find(']')+1:]
     test_bench.write("\t."+output+f'({output})\n')
-    
+
+print(input_vector)
 test_bench.write("\t);")
 
 ############ clock generator block ############
@@ -151,10 +165,22 @@ if clk_signal:
     test_bench.write("clk = 0;\n")
     test_bench.write("forever #(PERIOD/2)  clk=~clk; \nend" +'\n')
     
-    
+############ active low reset block ############
+for signal in input_vector:
+    if "reset" in signal:
+        test_bench.write("\n\n// reset pulse\n")
+        test_bench.write("initial "+ "begin\n")
+        test_bench.write(f"{signal} = 1'b0;\n")
+        test_bench.write("#(PERIOD/2);\n")
+        test_bench.write(f"{signal} = 1'b1;\n")
+        test_bench.write(" end" +'\n')
+        break
+        
 ############ initial block ############
 test_bench.write("\n\n// test vector generator\n")
 test_bench.write("initial "+ "begin\n\n")
+test_bench.write(f"@(negedge {signal}); // wait for the device to reset\n\n")
+
 test_bench.write("$finish; \nend" +'\n')
 
 test_bench.write("\nendmodule")
