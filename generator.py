@@ -13,14 +13,17 @@ rtl_code = " ".join(rtl_code.split()) #remove all white spaces
 
 # get module name
 module_name_start_index = rtl_code.find("module") + 6
-module_name_stop_index = rtl_code.find("(") if rtl_code.find("#") > rtl_code.find("(") else rtl_code.find("#")
+module_name_stop_index = rtl_code.find("(") if rtl_code.find("#") == -1  else rtl_code.find("#")
 module_name = rtl_code[module_name_start_index:module_name_stop_index].strip()
 
 # check if there is a clock signal 
 clk_signal = 1 if "clk" in rtl_code else 0
 clk_period_value = 20
 
-instance_name = 'uut' 
+# check for reset signal
+reset_signal = 0
+
+instance_name = 'uut' # default instance name
 
 
 ## trim the rtl code to get the inputs and outputs
@@ -54,6 +57,7 @@ for i, char in enumerate(rtl_code):
     if "input" in temp and "output" in temp:
         temp = "input" if (temp.find("input") >  temp.find("output")) else "output"
         signal = ''
+        size = ''
         discard_char = 1
          
     if temp.count("input") > 1 : 
@@ -69,9 +73,9 @@ for i, char in enumerate(rtl_code):
         
     if char == ')' :
         if "input" in temp :
-            input_vector.append(signal)
+            input_vector.append(size + " " + signal)
         elif "output" in temp:
-            output_vector.append(signal)
+            output_vector.append(size + " " + signal)
         break
     
     if "input" in temp :
@@ -82,11 +86,6 @@ for i, char in enumerate(rtl_code):
         elif char == "," or char ==';':
             input_vector.append(size + " " + signal)
             signal = ''
-        elif "output" in temp:
-            temp = "output"
-            signal = ''
-            size = ''
-            discard_char = 1
         elif discard_char:
             discard_char  = 0
             continue
@@ -99,12 +98,8 @@ for i, char in enumerate(rtl_code):
             signal = ''
             temp = "output"
         elif char == ',' or char ==';':
-            output_vector.append(signal)
+            output_vector.append(size + " " + signal)
             signal = ''
-        elif "input" in temp:
-            temp = "input"
-            signal = ''
-            discard_char = 1
         elif discard_char:
             discard_char  = 0
             continue
@@ -170,13 +165,14 @@ for signal in input_vector:
         test_bench.write("#(PERIOD/2);\n")
         test_bench.write(f"{signal} = 1'b1;\n")
         test_bench.write(" end" +'\n')
+        reset_signal = 1
         break
         
 ############ initial block ############
 test_bench.write("\n\n// test vector generator\n")
 test_bench.write("initial "+ "begin\n\n")
-test_bench.write(f"@(negedge {signal}); // wait for the device to reset\n\n")
+if reset_signal:
+    test_bench.write(f"@(negedge {signal}); // wait for the device to reset\n\n")
 
 test_bench.write("$finish; \nend" +'\n')
-
 test_bench.write("\nendmodule")
