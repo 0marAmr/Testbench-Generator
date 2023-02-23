@@ -32,7 +32,7 @@ module reg_file
                 B = 8           // no of bits in reg
      )
     (       
-        input wire [W-1 : 0] r_addr_A, r_addr_B, w_addr,
+        input wire r_addr_A, r_addr_B, w_addr,
         input wire clk, wr_en, n_reset,
         input wire [B-1 : 0] w_data,
         output wire [B-1 : 0] r_data_A, r_data_B
