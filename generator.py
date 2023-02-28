@@ -1,5 +1,8 @@
 HDL_file_name = str(input("Enter verilog file name: "))
 file = open(HDL_file_name+'.v', 'r')
+timeunit = '1ns'
+timeprecision = '1ps'
+delay=10
 rtl_code = file.read()
 test_bench=open(HDL_file_name+'_tb.v', 'w')
 
@@ -23,7 +26,7 @@ clk_period_value = 20
 # check for reset signal
 reset_signal = 0
 
-instance_name = 'uut' # default instance name
+instance_name = 'UUT' # default instance name
 
 
 ## trim the rtl code to get the inputs and outputs
@@ -120,6 +123,8 @@ for i,signal in enumerate(output_vector):
         output_vector[i] = signal[signal.find("reg")+4:]
 
 test_bench.write("/*test bench is automatically generated*/\n\n")
+test_bench.write("`include \"" +  HDL_file_name + '.v\"' +  '\n')
+test_bench.write("`timescale " + timeunit + '/' + timeprecision + '\n')
 test_bench.write("module ")
 test_bench.write(module_name+'_tb' + ';\n\n')
 
@@ -136,15 +141,22 @@ for output in output_vector:
 test_bench.write("\n// instantiation\n")
 test_bench.write(module_name + ' ' + instance_name + "(\n")
 
+print(input_vector)
+print(output_vector)
+
 for input in input_vector:
     if ']' in input:
         input = input[input.find(']')+1:]
-    test_bench.write("\t."+input+f'({input})\n')
+    test_bench.write("\t."+input+f'({input}),\n')
 
-for output in output_vector:
+for index, output in enumerate(output_vector):
+    print(f"{index}: {output}")
     if ']' in output:
         output = output[output.find(']')+1:]
-    test_bench.write("\t."+output+f'({output})\n')
+    if index != len(output_vector)-1:
+        test_bench.write("\t."+output+f'({output}),\n')
+    else:
+        test_bench.write("\t."+output+f'({output})\n')
 
 test_bench.write("\t);")
 
@@ -170,9 +182,23 @@ for signal in input_vector:
         
 ############ initial block ############
 test_bench.write("\n\n// test vector generator\n")
-test_bench.write("initial "+ "begin\n\n")
+test_bench.write("initial "+ "begin\n")
 if reset_signal:
     test_bench.write(f"@(negedge {signal}); // wait for the device to reset\n\n")
 
-test_bench.write("$finish; \nend" +'\n')
+test_bench.write("\t/* Dumping Files */\n")
+test_bench.write(f"\t$dumpfile(\"{module_name} _tb.vcd\");\n");
+test_bench.write(f"\t$dumpvars(1,{module_name}_tb);\n");
+
+test_bench.write("\t/* Generate Test Cases */\n")
+# if comb circuit 
+i=0
+while i < 2**len(input_vector):
+    test_bench.write(f"\t#{delay}")
+    for j, value in enumerate(input_vector): 
+        test_bench.write(f"{value}={(i & (1<<len(input_vector)- j-1)) >> len(input_vector)- j-1};")
+    test_bench.write("\n")
+    i=i+1
+
+test_bench.write(f"\t#{delay} $finish;\n\tend\n")
 test_bench.write("\nendmodule")
