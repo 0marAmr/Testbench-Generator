@@ -1,4 +1,4 @@
-HDL_file_name = str(input("Enter verilog file name: "))
+HDL_file_name =  str(input("Enter verilog file name: "))
 file = open(HDL_file_name+'.v', 'r')
 rtl_code = file.read()
 test_bench=open(HDL_file_name+'_tb.v', 'w')
@@ -10,7 +10,7 @@ while("/*" in rtl_code):
     rtl_code = rtl_code[:rtl_code.find("/*")] + rtl_code[rtl_code.find("*/")+2:]
 
 rtl_code = " ".join(rtl_code.split()) #remove all white spaces
-
+print(rtl_code)
 # get module name
 module_name_start_index = rtl_code.find("module") + 6
 module_name_stop_index = rtl_code.find("(") if rtl_code.find("#") == -1  else rtl_code.find("#")
@@ -19,6 +19,9 @@ module_name = rtl_code[module_name_start_index:module_name_stop_index].strip()
 # check if there is a clock signal 
 clk_signal = 1 if "clk" in rtl_code else 0
 clk_period_value = 20
+
+# check if there is a parameter
+parameter = 1 if "parameter" in rtl_code else 0
 
 # check for reset signal
 reset_signal = 0
@@ -60,13 +63,8 @@ for i, char in enumerate(rtl_code):
         size = ''
         discard_char = 1
          
-    if temp.count("input") > 1 : 
-        temp = "input"
-        signal = ''
-        size = ''
-        continue
-    elif temp.count("output") > 1 : 
-        temp = "output"
+    if temp.count("input") > 1 or temp.count("output") > 1 : 
+        temp = "input" if "input" in temp else "output"
         signal = ''
         size = ''
         continue
@@ -119,7 +117,8 @@ for i,signal in enumerate(output_vector):
     elif "reg" in signal:
         output_vector[i] = signal[signal.find("reg")+4:]
 
-test_bench.write("/*test bench is automatically generated*/\n\n")
+test_bench.write("/*test bench is automatically generated*/\n")
+test_bench.write("`timescale 1ns / 1ps\n\n")
 test_bench.write("module ")
 test_bench.write(module_name+'_tb' + ';\n\n')
 
@@ -136,15 +135,19 @@ for output in output_vector:
 test_bench.write("\n// instantiation\n")
 test_bench.write(module_name + ' ' + instance_name + "(\n")
 
+# def instantiation():   
+                    #[0:-1]
 for input in input_vector:
     if ']' in input:
         input = input[input.find(']')+1:]
-    test_bench.write("\t."+input+f'({input})\n')
+    input = input.strip()
+    test_bench.write("\t."+input+f'({input}),\n')
 
 for output in output_vector:
     if ']' in output:
         output = output[output.find(']')+1:]
-    test_bench.write("\t."+output+f'({output})\n')
+    output = output.strip()
+    test_bench.write("\t."+output+f'({output}),\n')
 
 test_bench.write("\t);")
 
@@ -158,7 +161,7 @@ if clk_signal:
     
 ############ active low reset block ############
 for signal in input_vector:
-    if "reset" in signal:
+    if "reset" in signal or "rst" in signal:
         test_bench.write("\n\n// reset pulse\n")
         test_bench.write("initial "+ "begin\n")
         test_bench.write(f"{signal} = 1'b0;\n")
